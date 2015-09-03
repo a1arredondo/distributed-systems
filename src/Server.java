@@ -52,8 +52,15 @@ public class Server {
 	
 	private void handleUDPClient(DatagramPacket packet) {
 		try {
-			//DatagramPacket returnPacket = new DatagramPacket();
-			
+			String returnValue = handleInput( new String( packet.getData() ) );
+			byte[] bytes = new byte[ returnValue.length() ];
+			DatagramPacket returnPacket = new DatagramPacket(
+						bytes,
+						bytes.length,
+						packet.getAddress(),
+						packet.getPort()
+					);
+			datagramSocket.send( returnPacket );
 		} catch (Exception e) {
 			System.out.println(e.getMessage());
 		}
