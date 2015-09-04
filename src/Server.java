@@ -96,6 +96,7 @@ public class Server {
 	    
 	    try {
 	    	Server server = new Server(N, tcpPort, udpPort);
+	    	server.startServer();
 	    } catch (Exception e) {
 	    	System.out.println(e.getMessage());
 	    }
