@@ -51,7 +51,7 @@ public class Server {
 					Channel channel = key.channel();
 					if ( key.isAcceptable() && channel == tcpChannel ) {
 						handleTCPClient();
-					} else if ( key.isAcceptable() && channel == udpChannel ) {
+					} else if ( key.isReadable() && channel == udpChannel ) {
 						handleUDPClient();
 					}
 				}
