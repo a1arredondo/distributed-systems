@@ -69,8 +69,12 @@ public class Server {
 			return returnValue;
 		} else if ( "reserve".equals( command.toLowerCase() ) ) {
 			returnValue = theater.reserve( tokenizer.nextToken() );
-		} else if ( "bookSeat".equals( command.toLowerCase() ) ) {
-			returnValue = theater.bookSeat( tokenizer.nextToken(), Integer.parseInt( tokenizer.nextToken() ) );
+		} else if ( "bookseat".equals( command.toLowerCase() ) ) {
+			String name = tokenizer.nextToken();
+			System.out.println(name);
+			String seat = tokenizer.nextToken();
+			System.out.println(seat);
+			returnValue = theater.bookSeat( name, Integer.parseInt( seat ) );
 		} else if ( "search".equals( command.toLowerCase() ) ) {
 			returnValue = theater.search( tokenizer.nextToken() );
 		} else if ( "delete".equals( command.toLowerCase() ) ) {
