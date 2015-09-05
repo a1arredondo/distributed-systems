@@ -1,31 +1,60 @@
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channel;
+import java.nio.channels.DatagramChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
+import java.util.Iterator;
+import java.util.Set;
 import java.util.StringTokenizer;
 
 public class Server {
-	private MovieTheater theater;
-	ServerSocket serverSocket;
-	DatagramSocket datagramSocket;
+	private Server.MovieTheater theater;
+	ServerSocketChannel tcpChannel;
+	DatagramChannel udpChannel;
+	Selector selector;
 	
 	public Server(int numberOfSeats, int tcpPort, int udpPort) throws IOException {
-		theater = MovieTheater.INSTANCE;
+		theater = Server.MovieTheater.INSTANCE;
 		theater.setCapacity(numberOfSeats);
-		serverSocket = new ServerSocket(tcpPort);
-		datagramSocket = new DatagramSocket(udpPort);
+		selector = Selector.open();
+		
+		InetAddress address = InetAddress.getByName("127.0.0.1");
+		SocketAddress tcpChannelPort = new InetSocketAddress(address, tcpPort);
+		SocketAddress udpChannelPort = new InetSocketAddress(address, udpPort);
+		
+		tcpChannel = ServerSocketChannel.open();
+		tcpChannel.socket().bind(tcpChannelPort);
+		tcpChannel.configureBlocking(false);
+		tcpChannel.register(selector, SelectionKey.OP_ACCEPT);
+		
+		udpChannel = DatagramChannel.open();
+		udpChannel.socket().bind(udpChannelPort);
+		udpChannel.configureBlocking(false);
+		udpChannel.register(selector, SelectionKey.OP_READ);
 	}
 	
 	public void startServer() {
 		try {
 			while ( true ) {
-				Socket socket = serverSocket.accept();
-				handleTCPClient(socket);
-				socket.close();
+				selector.select();
+				Set<SelectionKey> keys = selector.selectedKeys();
+				Iterator<SelectionKey> iterator = keys.iterator();
+				while ( iterator.hasNext() ) {
+					SelectionKey key = iterator.next();
+					iterator.remove();
+					Channel channel = key.channel();
+					if ( key.isAcceptable() && channel == tcpChannel ) {
+						handleTCPClient();
+					} else if ( key.isAcceptable() && channel == udpChannel ) {
+						handleUDPClient();
+					}
+				}
 			}
 		} catch (Exception e) {
 			System.out.println(e.getMessage());
@@ -50,29 +79,37 @@ public class Server {
 		return returnValue;
 	}
 	
-	private void handleUDPClient(DatagramPacket packet) {
+	private void handleTCPClient() {
+		SocketChannel channel = null;
 		try {
-			String returnValue = handleInput( new String( packet.getData() ) );
-			byte[] bytes = new byte[ returnValue.length() ];
-			DatagramPacket returnPacket = new DatagramPacket(
-						bytes,
-						bytes.length,
-						packet.getAddress(),
-						packet.getPort()
-					);
-			datagramSocket.send( returnPacket );
+			byte[] request = new byte[1024];
+			byte[] response;
+			
+			channel = tcpChannel.accept();
+			if ( channel != null ) {
+				channel.read(ByteBuffer.wrap(request));
+				String requestString = new String(request);
+				response = handleInput(requestString).getBytes();
+				channel.write(ByteBuffer.wrap(response));
+			}
 		} catch (Exception e) {
 			System.out.println(e.getMessage());
+		} finally {
+			if ( channel != null && channel.isOpen() ) {
+				try { channel.close(); } catch (Exception e) {}
+			}
 		}
 	}
 	
-	private void handleTCPClient(Socket socket) {
+	private void handleUDPClient() {
 		try {
-			BufferedReader bReader = new BufferedReader( new InputStreamReader( socket.getInputStream() ) );
-			PrintWriter pWriter = new PrintWriter( socket.getOutputStream() );
-			String input = bReader.readLine();
-			pWriter.println( handleInput( input ) );
-			pWriter.flush();
+			byte[] request = new byte[1024];
+			byte[] response;
+			
+			SocketAddress address = udpChannel.receive(ByteBuffer.wrap(request));
+			String requestString = new String(request);
+			response = handleInput(requestString).getBytes();
+			udpChannel.send(ByteBuffer.wrap(response), address);
 		} catch (Exception e) {
 			System.out.println(e.getMessage());
 		}
@@ -100,5 +137,66 @@ public class Server {
 	    } catch (Exception e) {
 	    	System.out.println(e.getMessage());
 	    }
+	}
+	
+	public enum MovieTheater {
+		INSTANCE;
+		
+		private static String NO_RESERVATION_FOUND = "No reservation found for ";
+		private static String SEAT_ALREADY_BOOKED = "Seat already booked against the name provided";
+		private static String SOLD_OUT = "Sold out - No seat available";
+		
+		private String[] currentReservations;
+		
+		public void setCapacity(int capacity) {
+			currentReservations = new String[capacity];
+		}
+		
+		public String reserve(String name) {
+			String message = SOLD_OUT;
+			if ( !( NO_RESERVATION_FOUND + name ).equals( search( name ) ) ) {
+				message = SEAT_ALREADY_BOOKED;
+			} else {
+				for (int i = 0; i < currentReservations.length; i++) {
+					if ( currentReservations[i] == null || "".equals( currentReservations[i] ) ) {
+						currentReservations[i] = name;
+						message = String.valueOf( i );
+						break;
+					}
+				}
+			}
+			return message;
+		}
+		
+		public String bookSeat(String name, int seat) {
+			String message = seat + " is not available";
+			if ( !( NO_RESERVATION_FOUND + name ).equals( search( name ) ) ) {
+				message = SEAT_ALREADY_BOOKED;
+			} else if ( currentReservations[seat] == null || "".equals( currentReservations[seat] ) ) {
+				currentReservations[seat] = name;
+				message = String.valueOf( seat );
+			}
+			return message;
+		}
+		
+		public String search(String name) {
+			String message = NO_RESERVATION_FOUND + name;
+			for (int i = 0; i < currentReservations.length; i++) {
+				if ( name != null && name.equals( currentReservations[i] ) ) {
+					message = String.valueOf( i );
+				}
+			}
+			return message;
+		}
+		
+		public String delete(String name) {
+			String message = NO_RESERVATION_FOUND + name;
+			String searchMessage = search( name );
+			if ( !( NO_RESERVATION_FOUND + name ).equals( searchMessage ) ) {
+				currentReservations[Integer.valueOf( searchMessage )] = null;
+				message = searchMessage;
+			}
+			return message;
+		}
 	}
 }
