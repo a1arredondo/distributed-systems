@@ -1,7 +1,13 @@
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.Socket;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.util.Scanner;
 
 public class Client {
@@ -27,7 +33,21 @@ public class Client {
 	}
 	
 	public static String doUDPRequest(String command, String host, int port) {
-		return "NOT IMPLEMENTED";
+		String returnValue = "";
+		try {
+			InetAddress address = InetAddress.getByName(host);
+			DatagramSocket socket = new DatagramSocket();
+			byte[] outBuffer = command.getBytes();
+			DatagramPacket outPacket = new DatagramPacket(outBuffer, outBuffer.length, address, port);
+			socket.send(outPacket);
+			byte[] inBuffer = new byte[1024];
+			DatagramPacket inPacket = new DatagramPacket(inBuffer, inBuffer.length);
+			socket.receive(inPacket);
+			returnValue = new String(inPacket.getData());
+		} catch (Exception e) {
+			System.out.println(e.getMessage());
+		}
+		return returnValue;
 	}
 	
   public static void main (String[] args) {
