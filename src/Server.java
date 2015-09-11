@@ -162,7 +162,7 @@ public class Server {
 				for (int i = 0; i < currentReservations.length; i++) {
 					if ( currentReservations[i] == null || "".equals( currentReservations[i] ) ) {
 						currentReservations[i] = name;
-						message = String.valueOf( i );
+						message = String.valueOf( i + 1 );
 						break;
 					}
 				}
@@ -174,8 +174,8 @@ public class Server {
 			String message = seat + " is not available";
 			if ( !( NO_RESERVATION_FOUND + name ).equals( search( name ) ) ) {
 				message = SEAT_ALREADY_BOOKED;
-			} else if ( currentReservations[seat] == null || "".equals( currentReservations[seat] ) ) {
-				currentReservations[seat] = name;
+			} else if ( currentReservations[seat - 1] == null || "".equals( currentReservations[seat - 1] ) && seat > 0 ) {
+				currentReservations[seat - 1] = name;
 				message = String.valueOf( seat );
 			}
 			return message;
@@ -185,7 +185,7 @@ public class Server {
 			String message = NO_RESERVATION_FOUND + name;
 			for (int i = 0; i < currentReservations.length; i++) {
 				if ( name != null && name.equals( currentReservations[i] ) ) {
-					message = String.valueOf( i );
+					message = String.valueOf( i + 1 );
 				}
 			}
 			return message;
